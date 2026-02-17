@@ -1,56 +1,166 @@
+/* 1. CỐ ĐỊNH CHIỀU CAO TRANG WEB */
+* {
+    box-sizing: border-box; /* Giúp tính toán kích thước chính xác */
+}
+
 body {
-    font-family: Arial;
+    font-family: Arial, sans-serif;
     background: #f4f6f9;
-    /* margin: 20px; */
     margin: 0;
-    padding: 20px;
-}
-
-.grid {
-    display: grid;
-    /* grid-template-columns: repeat(2, 1fr); */
-    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-    gap: 20px;
-}
-
-.card {
-    background: white;
-    padding: 20px;
-    border-radius: 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    padding: 10px; /* Padding nhỏ cho body */
+    
+    /* QUAN TRỌNG NHẤT: Ép trang web bằng đúng chiều cao màn hình */
+    height: 100vh; 
+    width: 100vw;
+    overflow: hidden; /* Cấm cuộn chuột */
+    
+    /* Dùng Flexbox dọc để chia bố cục: Tiêu đề -> Controls -> Biểu đồ */
     display: flex;
     flex-direction: column;
-    height: 420px;
 }
 
-.chart {
-    flex: 1;
-    width: 100%;
-    height: 400px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-#scatter {
-    width: 100%;
-    height: 400px;
-}
-
-#bar {
-    width: 100%;
-    height: 400px;
+/* 2. CÁC PHẦN CỐ ĐỊNH (Tiêu đề, Controls) */
+h1 {
+    margin: 0 0 10px 0;
+    font-size: 24px;
+    flex-shrink: 0; /* Không cho phép bị co lại */
 }
 
 .controls {
     background: white;
     padding: 10px 15px;
     border-radius: 10px;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    flex-shrink: 0; /* Không cho phép bị co lại */
 }
 
 .controls label {
     margin-right: 20px;
     font-weight: bold;
+}
+
+/* 3. LƯỚI BIỂU ĐỒ (Phần linh hoạt) */
+.grid {
+    /* Chiếm toàn bộ khoảng trống còn lại của màn hình */
+    flex: 1; 
+    
+    display: grid;
+    /* Chia 2 cột đều nhau */
+    grid-template-columns: 1fr 1fr; 
+    /* Chia 2 hàng đều nhau */
+    grid-template-rows: 1fr 1fr; 
+    
+    gap: 15px; /* Khoảng cách giữa các ô */
+    min-height: 0; /* Fix lỗi grid bị tràn màn hình */
+}
+
+/* 4. CẤU TRÚC THẺ (CARD) */
+.card {
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    
+    /* Flex để chia Tiêu đề card và Biểu đồ */
+    display: flex;
+    flex-direction: column;
+    
+    /* Card sẽ tự bung ra theo ô của Grid */
+    height: 100%; 
+    width: 100%;
+    overflow: hidden;
+    
+}
+
+.card-body {
+    flex: 1; /* Chiếm hết chiều cao còn lại của card */
+    display: flex; /* Xếp ngang */
+    flex-direction: row; 
+    gap: 10px;
+    min-height: 0; /* Quan trọng để con không bị tràn */
+    overflow: hidden;
+}
+
+.card h2 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    flex-shrink: 0; /* Tiêu đề không bị co */
+}
+
+/* Dropdown chọn Factor */
+.control {
+    margin-bottom: 5px;
+    flex-shrink: 0;
+}
+
+/* 5. VÙNG CHỨA BIỂU ĐỒ (CHART CONTAINER) */
+.chart {
+    /* Chiếm toàn bộ phần còn lại của Card */
+    flex: 1;
+    width: 100%;
+    
+    /* Quan trọng: min-height=0 để flex item co giãn đúng */
+    min-height: 0; 
+    position: relative;
+}
+
+.chart-col {
+    flex: 3; /* Chiếm 3 phần (75%) */
+    min-width: 0; /* Fix lỗi chart D3 không co lại */
+    position: relative;
+}
+.info-col {
+    flex: 1; /* Chiếm 1 phần (25%) */
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Căn giữa dọc */
+    padding: 10px;
+    font-size: 14px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    overflow-y: auto; /* Nếu chữ dài quá thì cuộn */
+}
+
+/* SVG ID */
+#scatter, #bar, #environment, #importance {
+    width: 100%;
+    height: 100%;
+}
+
+/* Style cho text insight để đẹp hơn */
+.stat-box {
+    margin-bottom: 15px;
+}
+.stat-value {
+    font-size: 24px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+.stat-label {
+    font-size: 12px;
+    color: #7f8c8d;
+}
+
+/* 6. TOOLTIP (Dùng Fixed cho màn hình cố định là chuẩn nhất) */
+#tooltip {
+    position: fixed; /* Vì màn hình không cuộn, fixed là chính xác tuyệt đối */
+    z-index: 9999;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    font-size: 13px;
+    pointer-events: none; /* Chống nhấp nháy */
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+/* Insight text ở dưới environment */
+.insight {
+    font-size: 13px;
+    margin-top: 5px;
+    text-align: center;
+    flex-shrink: 0;
 }

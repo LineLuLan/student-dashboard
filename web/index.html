@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 
+
 <div id="tooltip" style="
     position:absolute;
     background:white;
@@ -18,8 +19,8 @@
     opacity:0;
 "></div>
 
-
 <body>
+    
     <h1>Student Performance Dashboard</h1>
 
     <div class="controls">
@@ -30,31 +31,60 @@
 
 
     <div class="grid">
+    
         <div class="card">
             <h2>Study vs Score</h2>
-            <div class="chart">
-                <div id="scatter"></div>
-            </div>       
+            <div class="card-body">
+                <div class="chart-col">
+                    <div id="scatter"></div>
+                </div>
+                <div class="info-col" id="scatter-info">
+                    </div>
+            </div>      
         </div>
 
         <div class="card">
             <h2>Top vs Bottom Students</h2>
-            <div class="chart">
-                <div id="bar"></div>
+            <div class="card-body">
+                <div class="chart-col">
+                    <div id="bar"></div>
+                </div>
+                <div class="info-col" id="bar-info">
+                    </div>
             </div>
         </div>
 
         <div class="card">
-            <h2>Environment Impact</h2>
-            <div class="chart">
-                <div id="environment"></div>
+            <h2>Environment Trend</h2>
+            <div class="control" style="margin-bottom: 10px;">
+                <label>Factor: </label>
+                <select id="environmentSelect">
+                    <option value="attendance">Attendance</option>
+                    <option value="sleep_hours">Sleep Hours</option>
+                    <option value="physical_activity">Physical Activity</option>
+                    <option value="tutoring">Tutoring Hours</option>
+                </select>
+            </div>
+
+            <div class="card-body">
+                <div class="chart-col">
+                    <div id="environment"></div>
+                </div>
+                <div class="info-col" id="environment-info">
+                    <div id="environmentInsight"></div>
+                </div>
             </div>
         </div>
 
         <div class="card">
             <h2>Key Factors</h2>
-            <div class="chart">
-                <div id="importance"></div>
+            <div class="card-body">
+                <div class="chart-col">
+                    <div id="importance"></div>
+                </div>
+                <div class="info-col">
+                    <p>Analysis of feature importance...</p>
+                </div>
             </div>
         </div>
     </div>

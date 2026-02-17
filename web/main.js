@@ -2,8 +2,10 @@ console.log("Before import");
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import { drawScatter } from "./charts/scatter.js";
 import { drawTopBottom } from "./charts/bar.js";
+import { drawEnvironmentTrend } from "./charts/environment.js";
 
 console.log("After import");
+const select = document.getElementById("environmentSelect");
 
 let fullData = [];
 
@@ -15,7 +17,7 @@ d3.csv("data/clean_student_performance.csv", d => ({
     extracurricular: d.extracurricular,
     sleep_hours: +d.sleep_hours,
     previous_scores: +d.previous_scores,
-    motivation: d.motivation,
+    motivation: d.motivation ? d.motivation.trim().toLowerCase() : "medium",
     internet: d.internet,
     tutoring: +d.tutoring,
     family_income: d.family_income,
@@ -30,12 +32,15 @@ d3.csv("data/clean_student_performance.csv", d => ({
     exam_score: +d.exam_score
 }))
 .then(data => {
+    fullData = data.filter(d => !isNaN(d.exam_score) && !isNaN(d.hours_studied));
     console.log("CSV LOADED", data.length);
     console.log("parsed:", data[0]);
-    drawScatter(data);
-    drawTopBottom(data);
-    
-    fullData = data;
+
+    // drawScatter(data);
+    // drawTopBottom(data);
+    // drawEnvironmentTrend(data, select.value);
+
+    // fullData = data;
     update();
 });
 
@@ -53,14 +58,23 @@ function update() {
 
     console.log("filtered size:", filtered.length);
 
+    if (filtered.length === 0) {
+        d3.select("#scatter").html("<p style='text-align:center; padding-top:20px'>No data found</p>");
+        d3.select("#bar").html("");
+        d3.select("#environment").html("");
+        return;
+    }
+
     drawScatter(filtered);
     drawTopBottom(filtered);
-
+    drawEnvironmentTrend(filtered, select.value);
 }
 
 document.querySelectorAll(".controls input")
     .forEach(cb => cb.addEventListener("change", update));
 
+select.addEventListener("change", update);
+    
 window.addEventListener("resize", () => {
     update();
 });
