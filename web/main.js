@@ -50,7 +50,12 @@ function update() {
     console.log("filtered size:", filtered.length);
 
     drawScatter(filtered);
+
 }
 
 document.querySelectorAll(".controls input")
     .forEach(cb => cb.addEventListener("change", update));
+
+window.addEventListener("resize", () => {
+    update();
+});
