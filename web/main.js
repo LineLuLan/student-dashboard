@@ -1,6 +1,8 @@
 console.log("Before import");
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import { drawScatter } from "./charts/scatter.js";
+import { drawTopBottom } from "./charts/bar.js";
+
 console.log("After import");
 
 let fullData = [];
@@ -31,6 +33,8 @@ d3.csv("data/clean_student_performance.csv", d => ({
     console.log("CSV LOADED", data.length);
     console.log("parsed:", data[0]);
     drawScatter(data);
+    drawTopBottom(data);
+    
     fullData = data;
     update();
 });
@@ -50,6 +54,7 @@ function update() {
     console.log("filtered size:", filtered.length);
 
     drawScatter(filtered);
+    drawTopBottom(filtered);
 
 }
 
