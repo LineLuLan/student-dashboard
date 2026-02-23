@@ -2,13 +2,16 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
 export function drawTopBottom(data) {
     const container = d3.select("#bar");
+    const infoContainer = d3.select("#bar-info");
+
     container.selectAll("*").remove();
+    infoContainer.html("");
 
     if (!data || data.length === 0) return;
 
     const width = container.node().clientWidth;
     const height = container.node().clientHeight;
-    const margin = { top: 40, right: 30, bottom: 40, left: 50 };
+    const margin = { top: 20, right: 10, bottom: 30, left: 40 };
 
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
@@ -29,8 +32,26 @@ export function drawTopBottom(data) {
     const topAvg = d3.mean(top5, d => d.exam_score) || 0;
     const bottomAvg = d3.mean(bottom5, d => d.exam_score) || 0;
     
-    // Tính % chênh lệch
+    // SỬA LỖI Ở ĐÂY: Tính diffPercent TRƯỚC khi in ra HTML
     const diffPercent = bottomAvg === 0 ? 0 : ((topAvg - bottomAvg) / bottomAvg * 100);
+
+    // Điền text vào cột bên phải
+    infoContainer.html(`
+        <div class="stat-box">
+            <div class="stat-label">Top 5 Avg</div>
+            <div class="stat-value" style="color:#27ae60">${topAvg.toFixed(1)}</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Bottom 5 Avg</div>
+            <div class="stat-value" style="color:#c0392b">${bottomAvg.toFixed(1)}</div>
+        </div>
+        <hr style="border:0; border-top:1px solid #ddd; margin:10px 0;">
+        <div style="font-size:13px; line-height:1.4;">
+            Top students score 
+            <strong style="color:#27ae60; font-size:16px">${diffPercent.toFixed(1)}%</strong> 
+            higher than bottom students.
+        </div>
+    `);
 
     const summary = [
         { label: "Top 5 Avg", value: topAvg, color: "#27ae60" },
@@ -41,7 +62,7 @@ export function drawTopBottom(data) {
     const x = d3.scaleBand()
         .domain(summary.map(d => d.label))
         .range([0, innerWidth])
-        .padding(0.5); // Cột nhỏ lại cho thanh thoát
+        .padding(0.4); 
 
     const y = d3.scaleLinear()
         .domain([0, 100])
@@ -85,12 +106,12 @@ export function drawTopBottom(data) {
         .append("text")
         .attr("class", "bar-label")
         .attr("x", d => x(d.label) + x.bandwidth() / 2)
-        .attr("y", d => y(d.value) - 10) // Đẩy lên trên cột 10px để không bị dính
+        .attr("y", d => y(d.value) - 10) 
         .attr("text-anchor", "middle")
         .style("font-size", "14px")
         .style("font-weight", "bold")
         .style("fill", "#333")
-        .text(d => d.value.toFixed(1)) // Chỉ lấy 1 số thập phân cho gọn
+        .text(d => d.value.toFixed(1)) 
         .style("opacity", 0)
         .transition().delay(800).duration(500)
         .style("opacity", 1);
@@ -103,15 +124,4 @@ export function drawTopBottom(data) {
 
     chart.append("g")
         .call(d3.axisLeft(y).ticks(5));
-
-    // 6. INSIGHT TEXT (Đã sửa để hiện rõ ràng)
-    // Vẽ trực tiếp lên SVG ở vị trí trên cùng
-    svg.append("text")
-        .attr("x", width / 2)
-        .attr("y", height - 10) 
-        .attr("text-anchor", "middle")
-        .style("font-size", "14px")
-        .style("fill", "#555")
-        .style("font-style", "italic")
-        .text(`Gap: Top students score ${diffPercent.toFixed(1)}% higher than bottom students.`);
 }

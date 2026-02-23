@@ -1,18 +1,13 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
-console.log("SCATTER FILE LOADED");
-
 function linearRegression(data) {
     const n = data.length;
-
     const sumX = d3.sum(data, d => d.hours_studied);
     const sumY = d3.sum(data, d => d.exam_score);
     const sumXY = d3.sum(data, d => d.hours_studied * d.exam_score);
     const sumX2 = d3.sum(data, d => d.hours_studied * d.hours_studied);
 
-    const slope = (n * sumXY - sumX * sumY) /
-                  (n * sumX2 - sumX * sumX);
-
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
     const intercept = (sumY - slope * sumX) / n;
 
     return { slope, intercept };
@@ -20,38 +15,57 @@ function linearRegression(data) {
 
 function calculateR2(data, slope, intercept) {
     const meanY = d3.mean(data, d => d.exam_score);
-
-    const ssTotal = d3.sum(data, d => 
-        Math.pow(d.exam_score - meanY, 2)
-    );
-
-    const ssResidual = d3.sum(data, d => 
-        Math.pow(d.exam_score - (slope * d.hours_studied + intercept), 2)
-    );
-
+    const ssTotal = d3.sum(data, d => Math.pow(d.exam_score - meanY, 2));
+    const ssResidual = d3.sum(data, d => Math.pow(d.exam_score - (slope * d.hours_studied + intercept), 2));
     return 1 - (ssResidual / ssTotal);
 }
 
-
 export function drawScatter(data) {
-    console.log("drawScatter RUNNING", data.length);
-
     const container = d3.select("#scatter");
+    const infoContainer = d3.select("#scatter-info"); 
+    
     container.selectAll("*").remove();
+    infoContainer.html(""); 
 
+    if (!data || data.length === 0) return;
+
+    // --- 1. TÍNH TOÁN VÀ ĐIỀN THÔNG TIN CỘT PHẢI ---
+    const { slope, intercept } = linearRegression(data);
+    const r2 = calculateR2(data, slope, intercept);
+
+    infoContainer.html(`
+        <div class="stat-box">
+            <div class="stat-label">Correlation (R²)</div>
+            <div class="stat-value" style="color: ${r2 > 0.5 ? '#27ae60' : '#e67e22'}">
+                ${r2.toFixed(3)}
+            </div>
+            <div style="font-size:12px; margin-top:5px; color:#555">
+                ${r2 > 0.1 ? "There is a trend." : "Weak correlation."}
+            </div>
+        </div>
+        
+        <div class="stat-box" style="margin-top: 20px;">
+            <div class="stat-label">Legend</div>
+            <div style="display:flex; align-items:center; margin-top:5px; font-size:13px;">
+                <span style="width:12px; height:12px; background:#e74c3c; border-radius:50%; margin-right:8px;"></span> Low
+            </div>
+            <div style="display:flex; align-items:center; margin-top:5px; font-size:13px;">
+                <span style="width:12px; height:12px; background:#f1c40f; border-radius:50%; margin-right:8px;"></span> Medium
+            </div>
+            <div style="display:flex; align-items:center; margin-top:5px; font-size:13px;">
+                <span style="width:12px; height:12px; background:#2ecc71; border-radius:50%; margin-right:8px;"></span> High
+            </div>
+        </div>
+    `);
+
+    // --- 2. VẼ BIỂU ĐỒ BÊN TRÁI ---
     const width = container.node().clientWidth;
     const height = container.node().clientHeight;
+    const margin = { top: 20, right: 20, bottom: 45, left: 50 };
 
-    // 1. TĂNG MARGIN: Để đủ chỗ cho Label trục X và Y không bị cắt
-    const margin = { top: 40, right: 120, bottom: 60, left: 70 }; 
-    // right: 120 để dành chỗ cho Legend bên phải (nếu muốn đặt ngoài)
-    // hoặc giữ right: 30 nếu đặt Legend bên trong. 
-    // Ở đây mình đặt Legend bên trong cho gọn, nhưng tăng bottom/left để hiện Label.
-
-    const svg = container
-        .append("svg")
+    const svg = container.append("svg")
         .attr("viewBox", `0 0 ${width} ${height}`)
-        .style("overflow", "visible"); // Quan trọng: Để text không bị cắt nếu lỡ chòi ra ngoài
+        .style("overflow", "visible"); 
 
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
@@ -59,7 +73,6 @@ export function drawScatter(data) {
     const g = svg.append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // --- SCALES ---
     const x = d3.scaleLinear()
         .domain(d3.extent(data, d => d.hours_studied))
         .range([0, innerWidth]);
@@ -70,42 +83,47 @@ export function drawScatter(data) {
 
     const color = d3.scaleOrdinal()
         .domain(["low", "medium", "high"])
-        .range(["#e74c3c", "#f1c40f", "#2ecc71"]); // Đỏ, Vàng, Xanh
+        .range(["#e74c3c", "#f1c40f", "#2ecc71"]); 
 
-    // --- AXES ---
+    // Axes
     g.append("g")
         .attr("transform", `translate(0,${innerHeight})`)
         .call(d3.axisBottom(x));
 
     g.append("g")
-        .attr("class", "y-axis") // Đặt class để sau này update nếu cần
+        .attr("class", "y-axis")
         .call(d3.axisLeft(y));
 
-    // --- POINTS ---
-    const tooltip = d3.select("#tooltip");
+    // Points
+    const dotsGroup = g.append("g").attr("opacity", 0);
     
-    const circles = g.selectAll("circle")
+    const circles = dotsGroup.selectAll("circle")
         .data(data)
         .enter()
         .append("circle")
         .attr("cx", d => x(d.hours_studied))
-        .attr("cy", innerHeight) // Hiệu ứng ban đầu nằm ở đáy
-        .attr("r", 5)
+        // Set toạ độ thật ngay từ đầu, KHÔNG để ở innerHeight nữa
+        .attr("cy", d => y(d.exam_score)) 
+        .attr("r", 4) // Giảm size xuống 1 xíu cho đỡ rối mắt khi data đông
         .attr("fill", d => color(d.motivation))
         .attr("opacity", 0.7)
-        .attr("stroke", "#fff") // Viền trắng nhẹ cho từng điểm dễ nhìn hơn
-        .attr("stroke-width", 1);
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 0.5); // Giảm viền xuống để render nhẹ hơn
 
-    // Animation xuất hiện
-    circles.transition().duration(800).attr("cy", d => y(d.exam_score));
+    // 2. Chạy đúng 1 Animation làm sáng nguyên cả cụm lên
+    dotsGroup.transition().duration(800).attr("opacity", 1);
 
-    // --- TOOLTIP EVENTS ---
+    // --- TOOLTIP EVENTS (Giữ nguyên) ---
+    const tooltip = d3.select("#tooltip");
+    
     circles
         .on("mouseover", function(event, d) {
             d3.select(this)
-                .transition().duration(200)
-                .attr("r", 8)
-                .attr("stroke", "#333");
+                .transition().duration(100) // Giảm thời gian hover cho nhạy
+                .attr("r", 7)
+                .attr("stroke", "#333")
+                .attr("stroke-width", 1.5)
+                .attr("opacity", 1); // Hover vào thì sáng bừng lên
 
             tooltip.style("opacity", 1)
                 .html(`
@@ -121,24 +139,23 @@ export function drawScatter(data) {
                 `);
         })
         .on("mousemove", function(event) {
-            // Dùng clientX/Y để định vị fixed chính xác hơn
             tooltip
                 .style("left", (event.clientX + 15) + "px")
                 .style("top", (event.clientY - 20) + "px");
         })
         .on("mouseout", function() {
             d3.select(this)
-                .transition().duration(200)
-                .attr("r", 5)
-                .attr("stroke", "#fff");
+                .transition().duration(100)
+                .attr("r", 4)
+                .attr("stroke", "#fff")
+                .attr("stroke-width", 0.5)
+                .attr("opacity", 0.7);
+            
             tooltip.style("opacity", 0);
         });
 
-    // --- REGRESSION LINE & R2 (Giữ nguyên logic của bạn) ---
-    const { slope, intercept } = linearRegression(data);
+    // Regression Line
     const [xMin, xMax] = x.domain();
-    
-    // Vẽ line
     g.append("line")
         .attr("x1", x(xMin))
         .attr("y1", y(slope * xMin + intercept))
@@ -146,65 +163,23 @@ export function drawScatter(data) {
         .attr("y2", y(slope * xMax + intercept))
         .attr("stroke", "#e74c3c")
         .attr("stroke-width", 3)
-        .attr("stroke-dasharray", "5,5"); // Nét đứt nhìn cho "khoa học" hơn
+        .attr("stroke-dasharray", "5,5"); 
 
-    // R2 Text
-    const r2 = calculateR2(data, slope, intercept);
+    // Lables
     g.append("text")
-        .attr("x", innerWidth - 10)
-        .attr("y", innerHeight - 10) // Đưa xuống góc dưới phải cho đỡ vướng
-        .attr("text-anchor", "end")
-        .attr("font-size", 14)
-        .attr("fill", "#555")
-        .style("font-weight", "bold")
-        .text(`R² = ${r2.toFixed(3)}`);
-
-
-    // --- 2. THÊM LABEL TRỤC (AXIS LABELS) ---
-    
-    // Label trục X
-    g.append("text")
-        .attr("class", "axis-label")
         .attr("x", innerWidth / 2)
-        .attr("y", innerHeight + 45) // +45 là nằm gọn trong margin.bottom 60
+        .attr("y", innerHeight + 35) 
         .attr("text-anchor", "middle")
         .style("font-size", "14px")
         .style("fill", "#333")
         .text("Study Hours (per week)");
 
-    // Label trục Y
     g.append("text")
-        .attr("class", "axis-label")
         .attr("transform", "rotate(-90)")
         .attr("x", -innerHeight / 2)
-        .attr("y", -50) // -50 nằm gọn trong margin.left 70
+        .attr("y", -35) 
         .attr("text-anchor", "middle")
         .style("font-size", "14px")
         .style("fill", "#333")
         .text("Exam Score");
-
-    // --- 3. THÊM LEGEND (CHÚ THÍCH) ---
-    
-    const legendGroup = g.append("g")
-        .attr("transform", `translate(20, 10)`); // Đặt ở góc trên trái
-
-    const categories = ["low", "medium", "high"];
-    
-    categories.forEach((cat, i) => {
-        const row = legendGroup.append("g")
-            .attr("transform", `translate(0, ${i * 20})`);
-
-        row.append("circle")
-            .attr("r", 5)
-            .attr("fill", color(cat));
-
-        row.append("text")
-            .attr("x", 15)
-            .attr("y", 5)
-            .text(cat.charAt(0).toUpperCase() + cat.slice(1)) // Viết hoa chữ cái đầu
-            .style("font-size", "12px")
-            .style("alignment-baseline", "middle");
-    });
 }
-
-

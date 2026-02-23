@@ -3,6 +3,7 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import { drawScatter } from "./charts/scatter.js";
 import { drawTopBottom } from "./charts/bar.js";
 import { drawEnvironmentTrend } from "./charts/environment.js";
+import { drawKeyFactors } from "./charts/importance.js";
 
 console.log("After import");
 const select = document.getElementById("environmentSelect");
@@ -36,11 +37,6 @@ d3.csv("data/clean_student_performance.csv", d => ({
     console.log("CSV LOADED", data.length);
     console.log("parsed:", data[0]);
 
-    // drawScatter(data);
-    // drawTopBottom(data);
-    // drawEnvironmentTrend(data, select.value);
-
-    // fullData = data;
     update();
 });
 
@@ -62,12 +58,14 @@ function update() {
         d3.select("#scatter").html("<p style='text-align:center; padding-top:20px'>No data found</p>");
         d3.select("#bar").html("");
         d3.select("#environment").html("");
+        d3.select("#importance").html("");
         return;
     }
 
     drawScatter(filtered);
     drawTopBottom(filtered);
     drawEnvironmentTrend(filtered, select.value);
+    drawKeyFactors(filtered);
 }
 
 document.querySelectorAll(".controls input")

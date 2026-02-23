@@ -125,10 +125,18 @@ export function drawEnvironmentTrend(data, factor) {
         
         // Cập nhật text vào thẻ div có id environmentInsight trong HTML
         d3.select("#environmentInsight")
-            .style("padding", "10px")
-            .style("text-align", "center")
+            .style("text-align", "left") // Căn trái cho hợp sidebar
             .html(`
-                Impact: As <b>${factor}</b> increases, scores tend to <b style="color:${color}">${trendText}</b> by <b>${Math.abs(diff).toFixed(1)}</b> points.
+                <div class="stat-box">
+                    <div class="stat-label">Impact Analysis</div>
+                    <div style="font-size:13px; margin-top:5px;">
+                        As <b>${factor}</b> increases, scores tend to 
+                        <b style="color:${color}">${trendText}</b> by 
+                        <span style="font-size:18px; font-weight:bold; color:${color}">
+                            ${Math.abs(diff).toFixed(1)}
+                        </span> points.
+                    </div>
+                </div>
             `);
     }
     
