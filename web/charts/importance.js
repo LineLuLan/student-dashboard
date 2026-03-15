@@ -1,191 +1,206 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
-function getCorrelation(data, fieldX, fieldY) {
-    const meanX = d3.mean(data, d => d[fieldX]);
-    const meanY = d3.mean(data, d => d[fieldY]);
-    
-    let num = 0, denX = 0, denY = 0;
-    
-    data.forEach(d => {
-        const dx = d[fieldX] - meanX;
-        const dy = d[fieldY] - meanY;
-        num += dx * dy;
-        denX += dx * dx;
-        denY += dy * dy;
+function pearsonR(data, field) {
+    const vals   = data.map(d => +d[field]).filter(v => !isNaN(v));
+    const scores = data.filter(d => !isNaN(+d[field])).map(d => d.exam_score);
+    if (!vals.length) return 0;
+    const mx = d3.mean(vals), my = d3.mean(scores);
+    let num=0,dx2=0,dy2=0;
+    vals.forEach((x,i) => {
+        const dx=x-mx, dy=scores[i]-my;
+        num+=dx*dy; dx2+=dx*dx; dy2+=dy*dy;
     });
-    
-    if (denX === 0 || denY === 0) return 0;
-    return num / Math.sqrt(denX * denY);
+    return (dx2&&dy2) ? num/Math.sqrt(dx2*dy2) : 0;
 }
 
-export function drawKeyFactors(data) {
+function encodeAndCorrelate(data, field) {
+    const unique = [...new Set(data.map(d => d[field]))].filter(Boolean).sort();
+    const fake   = data.map(d => ({ [field]: unique.indexOf(d[field]), exam_score: d.exam_score }))
+                       .filter(d => d[field] >= 0);
+    if (!fake.length) return 0;
+    return pearsonR(fake, field);
+}
+
+const FIELDS = [
+    { key: "attendance",           label: "Attendance",       type: "numeric"     },
+    { key: "hours_studied",        label: "Study Hours",      type: "numeric"     },
+    { key: "previous_scores",      label: "Prev. Scores",     type: "numeric"     },
+    { key: "tutoring",             label: "Tutoring",         type: "numeric"     },
+    { key: "parental_involvement", label: "Parental Involv.", type: "categorical" },
+    { key: "resources",            label: "Resources",        type: "categorical" },
+    { key: "physical_activity",    label: "Physical Act.",    type: "numeric"     },
+    { key: "sleep_hours",          label: "Sleep Hours",      type: "numeric"     },
+];
+
+export function drawKeyFactors(data, onBarClick) {
     const container = d3.select("#importance");
-    const infoContainer = d3.select("#importance-info");
+    const infoPanel = d3.select("#importance-info");
+    container.selectAll("*").interrupt().remove();
+    infoPanel.html("");
 
-    container.selectAll("*").remove();
-    infoContainer.html("");
+    if (!data || data.length === 0) {
+        container.html(`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;opacity:0.5"><div style="font-size:20px">⚙</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">Select a motivation filter above</div></div>`);
+        return;
+    }
 
-    if (!data || data.length === 0) return;
+    const correlations = FIELDS.map(f => ({
+        ...f,
+        r:   f.type === "numeric" ? pearsonR(data, f.key) : encodeAndCorrelate(data, f.key),
+        abs: 0
+    }));
+    correlations.forEach(d => d.abs = Math.abs(d.r));
+    correlations.sort((a,b) => b.abs - a.abs);
 
-    // --- 1. DATA PROCESSING ---
-    const numericFields = [
-        "hours_studied", "attendance", "sleep_hours", 
-        "previous_scores", "tutoring", "physical_activity"
-    ];
+    const top1 = correlations[0];
+    const top2 = correlations[1];
+    const last = correlations[correlations.length - 1];
 
-    let correlations = numericFields.map(field => {
-        const r = getCorrelation(data, field, "exam_score");
-        return {
-            field: field.replace("_", " ").toUpperCase(),
-            r: r,
-            importance: Math.abs(r)
-        };
-    });
+    // No side panel — lollipop chart is self-explanatory
+    infoPanel.html("");
 
-    correlations.sort((a, b) => b.importance - a.importance);
+    const _rect = container.node().getBoundingClientRect();
+    const w = _rect.width  || container.node().offsetWidth  || container.node().parentNode?.clientWidth  || 300;
+    const h = _rect.height || container.node().offsetHeight || container.node().parentNode?.clientHeight || 200;
+    if (w < 10 || h < 10) return;
 
-    // --- 2. RIGHT COLUMN INSIGHT (Thiết kế lại gọn gàng hơn để không bị tràn) ---
-    const topFactor = correlations[0];
-    const top2Factor = correlations[1];
-
-    // Bọc trong thẻ div margin: auto 0 để fix lỗi flexbox cắt mất chữ trên cùng
-    infoContainer.html(`
-        <div style="width: 100%; margin: auto 0;">
-            <div style="margin-bottom: 15px;">
-                <div style="font-size: 11px; font-weight: bold; color: #7f8c8d; text-transform: uppercase;">1st Key Factor</div>
-                <div style="color: #4C6EF5; font-size: 18px; font-weight: bold; line-height: 1.2; margin-top: 2px;">
-                    ${topFactor.field}
-                </div>
-                <div style="font-size: 12px; color: #333; margin-top: 2px;">
-                    Correlation: <strong>${topFactor.r.toFixed(2)}</strong>
-                </div>
-            </div>
-
-            <div style="margin-bottom: 15px;">
-                <div style="font-size: 11px; font-weight: bold; color: #7f8c8d; text-transform: uppercase;">2nd Key Factor</div>
-                <div style="color: #6c5ce7; font-size: 16px; font-weight: bold; line-height: 1.2; margin-top: 2px;">
-                    ${top2Factor.field}
-                </div>
-                <div style="font-size: 12px; color: #333; margin-top: 2px;">
-                    Correlation: <strong>${top2Factor.r.toFixed(2)}</strong>
-                </div>
-            </div>
-
-            <div style="font-size: 11px; line-height: 1.3; font-style: italic; color: #888; border-top: 1px dashed #ccc; padding-top: 8px;">
-                * Longer bars indicate a stronger relationship with Exam Score.
-            </div>
-        </div>
-    `);
-
-    // --- 3. DRAW CHART ---
-    const width = container.node().clientWidth;
-    const height = container.node().clientHeight;
-    
-    // Nới rộng margin phải để lấy chỗ cho con số, thu gọn top/bottom
-    const margin = { top: 15, right: 35, bottom: 20, left: 130 };
+    // Lollipop: always use short labels to prevent truncation
+    const SHORT_LABELS = {
+        "Attendance":       "Attendance",
+        "Study Hours":      "Study Hrs",
+        "Prev. Scores":     "Prev. Score",
+        "Tutoring":         "Tutoring",
+        "Parental Involv.": "Parental",
+        "Resources":        "Resources",
+        "Physical Act.":    "Physical",
+        "Sleep Hours":      "Sleep Hrs"
+    };
+    const useShort = true;  // always short — prevents truncation at any card width
+    const leftMargin = Math.min(80, w * 0.36);
+    const m = { top: 6, right: 40, bottom: 8, left: leftMargin };
+    const iw = w - m.left - m.right;
+    const ih = h - m.top - m.bottom;
+    if (iw <= 4 || ih <= 4) return;
 
     const svg = container.append("svg")
-        .attr("viewBox", `0 0 ${width} ${height}`)
-        .style("overflow", "visible");
+        .attr("width", w).attr("height", h)
+        .style("overflow","visible");
+    const g = svg.append("g").attr("transform",`translate(${m.left},${m.top})`);
 
-    const innerWidth = width - margin.left - margin.right;
-    const innerHeight = height - margin.top - margin.bottom;
+    const maxAbs = d3.max(correlations, d => d.abs) || 1;
+    const x = d3.scaleLinear().domain([-maxAbs * 1.1, maxAbs * 1.1]).range([0, iw]);
+    const y = d3.scaleBand().domain(correlations.map(d => d.label)).range([0, ih]).padding(0.3);
 
-    const chart = svg.append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
+    const zero = x(0);
 
-    // Scale X: Nhân max với 1.15 (thêm 15% khoảng trống) để số không bị đụng vách
-    const maxImportance = d3.max(correlations, d => d.importance);
-    const x = d3.scaleLinear()
-        .domain([0, maxImportance * 1.15]) 
-        .range([0, innerWidth]);
+    // Zero line
+    g.append("line")
+        .attr("x1", zero).attr("x2", zero)
+        .attr("y1", 0).attr("y2", ih)
+        .attr("stroke","var(--border)").attr("stroke-width",1.5)
+        .attr("stroke-dasharray","4,3");
 
-    const y = d3.scaleBand()
-        .domain(correlations.map(d => d.field))
-        .range([0, innerHeight])
-        .padding(0.35); // Tăng padding để thanh bar mảnh hơn
+    // Subtle x gridlines
+    [-0.4,-0.2,0.2,0.4,0.6].forEach(v => {
+        if (Math.abs(v) <= maxAbs) {
+            g.append("line")
+                .attr("x1",x(v)).attr("x2",x(v))
+                .attr("y1",0).attr("y2",ih)
+                .attr("stroke","var(--border)").attr("stroke-width",0.5)
+                .attr("stroke-dasharray","2,4");
+        }
+    });
 
-    // Gridlines (Đường kẻ mờ phía sau)
-    chart.append("g")
-        .attr("class", "grid")
-        .attr("transform", `translate(0, ${innerHeight})`)
-        .call(d3.axisBottom(x)
-            .ticks(5)
-            .tickSize(-innerHeight)
-            .tickFormat("")
-        )
-        .selectAll("line").attr("stroke", "#e2e8f0").attr("stroke-dasharray", "4,4");
+    const dotColor = (d, i) => {
+        if (d.r < 0) return "var(--accent-red)";
+        if (i === 0) return "var(--accent-blue)";
+        if (i === 1) return "var(--accent-purple)";
+        return "var(--accent-green)";
+    };
 
-    chart.select(".grid .domain").remove(); // Ẩn đường viền dưới của grid
-
-    // Tooltip
     const tooltip = d3.select("#tooltip");
 
-    // Bars
-    chart.selectAll(".bar")
-        .data(correlations)
-        .enter()
-        .append("rect")
-        .attr("class", "bar")
-        .attr("x", 0)
-        .attr("y", d => y(d.field))
-        .attr("height", y.bandwidth())
-        .attr("fill", (d, i) => i === 0 ? "#4C6EF5" : (i === 1 ? "#6c5ce7" : "#cbd5e1")) // Tô màu xám cho các yếu tố không quan trọng
-        .attr("rx", 3) // Bo góc nhẹ
-        .attr("width", 0) 
-        .on("mouseover", function(event, d) {
-            d3.select(this).attr("opacity", 0.8);
-            const trend = d.r > 0 ? "Positive" : "Negative";
-            tooltip.style("opacity", 1)
-                .html(`
-                    <div style="font-family:sans-serif;">
-                        <strong>${d.field}</strong><br>
-                        Correlation: ${d.r.toFixed(3)}<br>
-                        <em>(${trend} impact)</em>
-                    </div>
+    correlations.forEach((d, i) => {
+        const cy = y(d.label) + y.bandwidth() / 2;
+        const cx = x(d.r);
+        const col = dotColor(d, i);
+        const isClickable = d.type === "numeric" || d.clickable;
+
+        // Stem line from zero to dot
+        g.append("line")
+            .attr("x1", zero).attr("y1", cy)
+            .attr("x2", cx).attr("y2", cy)
+            .attr("stroke", col)
+            .attr("stroke-width", i < 2 ? 2.5 : 1.8)
+            .attr("opacity", i < 2 ? 0.75 : 0.55);
+
+        // Dot
+        const dot = g.append("circle")
+            .attr("cx", cx).attr("cy", cy)
+            .attr("r", i < 2 ? 7 : 5)
+            .attr("fill", col)
+            .attr("opacity", i < 2 ? 1 : 0.65)
+            .attr("stroke", "var(--surface)").attr("stroke-width", 1.5)
+            .attr("cursor", isClickable ? "pointer" : "default");
+
+        // r value label next to dot
+        const labelX = d.r >= 0 ? cx + 10 : cx - 10;
+        const anchor = d.r >= 0 ? "start" : "end";
+        g.append("text")
+            .attr("x", labelX).attr("y", cy + 1)
+            .attr("dominant-baseline","middle")
+            .attr("text-anchor", anchor)
+            .attr("font-family","var(--font-mono)").attr("font-size", i < 2 ? "10px" : "9px")
+            .attr("font-weight", i < 2 ? "700" : "400")
+            .attr("fill", col)
+            .text(d.r.toFixed(2));
+
+        // Y axis labels (left side)
+        g.append("text")
+            .attr("x", -6).attr("y", cy)
+            .attr("dominant-baseline","middle")
+            .attr("text-anchor","end")
+            .attr("font-family","var(--font-mono)")
+            .attr("font-size", "10px")
+            .attr("font-weight", i < 2 ? "600" : "400")
+            .attr("fill", i < 2 ? "var(--text-primary)" : "var(--text-secondary)")
+            .text(useShort ? (SHORT_LABELS[d.label] || d.label) : d.label);
+
+        // Interactions
+        dot.on("mouseover", function(event) {
+                d3.select(this).attr("r", i < 2 ? 9 : 7).attr("opacity", 1);
+                const hint = isClickable ? `<br><em style="color:var(--accent-blue);font-size:10px">Click → explore in scatter</em>` : "";
+                tooltip.style("opacity",1).html(`
+                    <strong>${d.label}</strong>
+                    <strong>Pearson r</strong><span class="tt-val">${d.r.toFixed(3)}</span>
+                    <strong>Type</strong><span class="tt-val" style="text-transform:capitalize">${d.type}</span>${hint}
                 `);
-        })
-        .on("mousemove", event => {
-            tooltip.style("left", (event.clientX + 15) + "px")
-                   .style("top", (event.clientY - 20) + "px");
-        })
-        .on("mouseout", function() {
-            d3.select(this).attr("opacity", 1);
-            tooltip.style("opacity", 0);
-        })
-        .transition().duration(800)
-        .attr("width", d => x(d.importance));
+            })
+            .on("mousemove", e => {
+                const tx = e.clientX + 16;
+                const ty = Math.min(e.clientY - 10, window.innerHeight - 120);
+                tooltip.style("left", tx+"px").style("top", ty+"px");
+            })
+            .on("mouseout", function() {
+                d3.select(this).attr("r", i < 2 ? 7 : 5).attr("opacity", i < 2 ? 1 : 0.65);
+                tooltip.style("opacity",0);
+            })
+            .on("click", function(event) {
+                if ((!isClickable && !d.clickable) || !onBarClick) return;
+                g.selectAll("circle").attr("stroke","var(--surface)").attr("stroke-width",1.5);
+                d3.select(this).attr("stroke","var(--accent-blue)").attr("stroke-width",2.5);
+                onBarClick(d.key, d.label);
+            });
+    });
 
-    // Value Labels (Các con số nằm ngay đuôi thanh bar)
-    chart.selectAll(".val-label")
-        .data(correlations)
-        .enter()
-        .append("text")
-        .attr("class", "val-label")
-        .attr("y", d => y(d.field) + y.bandwidth() / 2)
-        .attr("x", d => x(d.importance) + 6) // Cách đuôi bar 6px
-        .attr("alignment-baseline", "middle")
-        .style("font-size", "11px")
-        .style("font-weight", "bold")
-        .style("fill", (d, i) => i === 0 ? "#4C6EF5" : (i === 1 ? "#6c5ce7" : "#64748b"))
-        .text(d => d.r.toFixed(2))
-        .style("opacity", 0)
-        .transition().delay(600).duration(400)
-        .style("opacity", 1);
-
-    // X Axis
-    chart.append("g")
-        .attr("transform", `translate(0,${innerHeight})`)
-        .call(d3.axisBottom(x).ticks(5))
-        .style("font-size", "10px")
-        .style("color", "#94a3b8")
-        .select(".domain").remove();
-
-    // Y Axis
-    chart.append("g")
-        .call(d3.axisLeft(y))
-        .style("font-size", "10px")
-        .style("font-weight", "bold")
-        .style("color", "#475569")
-        .selectAll(".domain, .tick line").remove(); // Cạo sạch các đường viền đen dư thừa
+    // X axis tick labels at bottom
+    [-0.2, 0, 0.2, 0.4, 0.6].forEach(v => {
+        if (x(v) >= 0 && x(v) <= iw) {
+            g.append("text")
+                .attr("x", x(v)).attr("y", ih + 14)
+                .attr("text-anchor","middle")
+                .attr("font-family","var(--font-mono)").attr("font-size","8px")
+                .attr("fill","var(--text-muted)")
+                .text(v.toFixed(1));
+        }
+    });
 }

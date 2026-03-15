@@ -1,144 +1,190 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
+const FACTOR_LABELS = {
+    attendance:        "Attendance (%)",
+    sleep_hours:       "Sleep Hours",
+    physical_activity: "Physical Activity (days/wk)",
+    tutoring:          "Tutoring Sessions",
+    previous_scores:   "Previous Scores"
+};
+
+function pearsonR(data, field) {
+    const meanX = d3.mean(data, d => d[field]);
+    const meanY = d3.mean(data, d => d.exam_score);
+    let num=0, denX=0, denY=0;
+    data.forEach(d => {
+        const dx = d[field]-meanX, dy = d.exam_score-meanY;
+        num+=dx*dy; denX+=dx*dx; denY+=dy*dy;
+    });
+    return (denX&&denY) ? num/Math.sqrt(denX*denY) : 0;
+}
+
 export function drawEnvironmentTrend(data, factor) {
     const container = d3.select("#environment");
-    container.selectAll("*").remove(); // Xóa sạch cũ
+    container.selectAll("*").interrupt().remove();
+    d3.select("#environmentInsight").html(""); // clear stale values immediately
 
-    if (!data || data.length === 0) return;
+    if (!data || data.length === 0) {
+        container.html(`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;opacity:0.5">
+            <div style="font-size:22px">⚙</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);letter-spacing:0.05em">Select a motivation filter above</div>
+        </div>`);
+        return;
+    }
 
-    const width = container.node().clientWidth;
-    const height = container.node().clientHeight;
-    const margin = { top: 20, right: 30, bottom: 50, left: 50 };
-    const innerWidth = width - margin.left - margin.right;
-    const innerHeight = height - margin.top - margin.bottom;
+    const _rect = container.node().getBoundingClientRect();
+    const w = _rect.width  || container.node().offsetWidth  || container.node().parentNode?.clientWidth  || 300;
+    const h = _rect.height || container.node().offsetHeight || container.node().parentNode?.clientHeight || 200;
+    if (w < 10 || h < 10) return;
 
-    const svg = container.append("svg")
-        .attr("width", width)
-        .attr("height", height)
-        .style("overflow", "visible");
+    // ── FIX: tighter margins, more room for chart ──
+    const m = { top: 10, right: 12, bottom: 38, left: 38 };
+    const iw = w - m.left - m.right;
+    const ih = h - m.top - m.bottom;
+    if (iw <= 0 || ih <= 0) return;
 
-    const chart = svg.append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
+    const svg = container.append("svg").attr("width",w).attr("height",h).style("overflow","visible");
+    const g   = svg.append("g").attr("transform",`translate(${m.left},${m.top})`);
 
-    // --- 1. Scales ---
-    // Lấy giá trị dynamic theo biến factor (vd: d["attendance"])
-    const xValues = data.map(d => +d[factor]); 
-    
-    // SỬA LỖI: Đặt tên biến rõ ràng là xScale
-    const xScale = d3.scaleLinear() 
-        .domain(d3.extent(xValues))
-        .nice()
-        .range([0, innerWidth]);
+    const xVals   = data.map(d => +d[factor]);
+    const xExtent = d3.extent(xVals);
+    const xScale  = d3.scaleLinear().domain(xExtent).nice().range([0, iw]);
 
-    const bins = d3.bin()
-        .domain(xScale.domain())
-        .thresholds(15)(xValues);
-
-    // --- 2. Tính toán Trend (Mean Score per Bin) ---
+    const bins = d3.bin().domain(xScale.domain()).thresholds(14)(xVals);
     const trendData = bins.map(bin => {
-        const binData = data.filter(d => 
-            +d[factor] >= bin.x0 && +d[factor] < bin.x1
-        );
+        const binData = data.filter(d => +d[factor] >= bin.x0 && +d[factor] < bin.x1);
+        const scores  = binData.map(d => d.exam_score).sort(d3.ascending);
         return {
-            x: (bin.x0 + bin.x1) / 2,
+            x:         (bin.x0 + bin.x1) / 2,
             meanScore: d3.mean(binData, d => d.exam_score),
-            count: binData.length
+            q1:        d3.quantile(scores, 0.25),
+            q3:        d3.quantile(scores, 0.75),
+            count:     binData.length
         };
-    }).filter(d => d.meanScore !== undefined); // Lọc bỏ bin rỗng
+    }).filter(d => d.meanScore !== undefined && d.count >= 2);
 
+    if (trendData.length === 0) return;
+
+    // ── FIX: Y domain based on trend means only (tighter range) ──
+    const meanExtent = d3.extent(trendData, d => d.meanScore);
+    const yPad = Math.max((meanExtent[1] - meanExtent[0]) * 0.15, 2);
     const yScale = d3.scaleLinear()
-        .domain([50, 100]) // Fix trục Y từ 50-100 để thấy rõ biến động
+        .domain([meanExtent[0] - yPad, meanExtent[1] + yPad])
         .nice()
-        .range([innerHeight, 0]);
+        .range([ih, 0]);
 
-    // --- 3. Vẽ Đường Line ---
-    const line = d3.line()
-        .x(d => xScale(d.x))        // SỬA LỖI: Dùng xScale thay vì x
-        .y(d => yScale(d.meanScore)) // SỬA LỖI: Dùng yScale thay vì y
+    // Gridlines
+    const _gl = g.append("g").attr("class","gl");
+    _gl.call(d3.axisLeft(yScale).ticks(5).tickSize(-iw).tickFormat(""));
+    _gl.selectAll("line").attr("stroke","var(--border)").attr("stroke-dasharray","3,3");
+    _gl.select(".domain").remove();
+
+    // IQR band
+    const area = d3.area()
+        .x(d => xScale(d.x))
+        .y0(d => yScale(d.q1 || d.meanScore))
+        .y1(d => yScale(d.q3 || d.meanScore))
         .curve(d3.curveMonotoneX);
 
-    chart.append("path")
-        .datum(trendData)
-        .attr("fill", "none")
-        .attr("stroke", "#4C6EF5")
-        .attr("stroke-width", 3)
+    g.append("path").datum(trendData)
+        .attr("fill","var(--accent-blue)").attr("opacity",0.08)
+        .attr("d", area);
+
+    // Mean trend line
+    const line = d3.line()
+        .x(d => xScale(d.x))
+        .y(d => yScale(d.meanScore))
+        .curve(d3.curveMonotoneX);
+
+    const path = g.append("path").datum(trendData)
+        .attr("fill","none")
+        .attr("stroke","var(--accent-blue)")
+        .attr("stroke-width",2.5)
         .attr("d", line);
 
-    // --- 4. Vẽ các điểm chốt (Trend points) ---
-    const tooltip = d3.select("#tooltip");
+    const totalLength = path.node().getTotalLength();
+    path.attr("stroke-dasharray",`${totalLength} ${totalLength}`)
+        .attr("stroke-dashoffset", totalLength)
+        .transition().duration(900).ease(d3.easeQuadOut)
+        .attr("stroke-dashoffset",0);
 
-    chart.selectAll(".trend-point")
-        .data(trendData)
-        .enter()
-        .append("circle")
-        .attr("class", "trend-point")
+    // Dots
+    const tooltip = d3.select("#tooltip");
+    g.selectAll(".tpoint").data(trendData).enter().append("circle")
+        .attr("class","tpoint")
         .attr("cx", d => xScale(d.x))
         .attr("cy", d => yScale(d.meanScore))
-        .attr("r", 6)
-        .attr("fill", "white")
-        .attr("stroke", "#4C6EF5")
-        .attr("stroke-width", 2)
-        .on("mouseover", function(event, d) {
-            d3.select(this).attr("r", 9).attr("fill", "#4C6EF5");
-            tooltip.style("opacity", 1)
-                .html(`
-                    <strong>${factor}:</strong> ${d.x.toFixed(1)}<br>
-                    <strong>Avg Score:</strong> ${d.meanScore.toFixed(1)}<br>
-                    <strong>Students:</strong> ${d.count}
-                `);
+        .attr("r", 4)
+        .attr("fill","var(--surface)")
+        .attr("stroke","var(--accent-blue)").attr("stroke-width",2)
+        .on("mouseover", function(event,d) {
+            d3.select(this).attr("r",6).attr("fill","var(--accent-blue)");
+            tooltip.style("opacity",1).html(`
+                <strong>${FACTOR_LABELS[factor]||factor}</strong><span class="tt-val">${d.x.toFixed(1)}</span>
+                <strong>Avg Score</strong><span class="tt-val">${d.meanScore.toFixed(1)}</span>
+                <strong>IQR</strong><span class="tt-val">${d.q1?.toFixed(1)} – ${d.q3?.toFixed(1)}</span>
+                <strong>n</strong><span class="tt-val">${d.count} students</span>
+            `);
         })
-        .on("mousemove", event => {
-            tooltip
-                .style("left", (event.clientX + 10) + "px")
-                .style("top", (event.clientY + 10) + "px");
-        })
+        .on("mousemove", e => {
+                const tx = Math.min(e.clientX + 16, window.innerWidth  - 230);
+                const ty = Math.min(e.clientY - 10, window.innerHeight - 140);
+                tooltip.style("left", tx+"px").style("top", ty+"px");
+            })
         .on("mouseout", function() {
-            d3.select(this).attr("r", 6).attr("fill", "white");
-            tooltip.style("opacity", 0);
+            d3.select(this).attr("r",4).attr("fill","var(--surface)");
+            tooltip.style("opacity",0);
         });
 
-    // --- 5. Axes ---
-    chart.append("g")
-        .attr("transform", `translate(0,${innerHeight})`)
-        .call(d3.axisBottom(xScale));
+    // Axes
+    g.append("g").attr("transform",`translate(0,${ih})`).call(d3.axisBottom(xScale).ticks(8));
+    g.append("g").call(d3.axisLeft(yScale).ticks(4));
 
-    chart.append("g")
-        .call(d3.axisLeft(yScale));
-        
-    // Label trục X
-    chart.append("text")
-        .attr("x", innerWidth / 2)
-        .attr("y", innerHeight + 40)
-        .attr("text-anchor", "middle")
-        .style("font-size", "12px")
-        .style("fill", "#666")
-        .text(factor.replace("_", " ").toUpperCase());
+    // Axis labels
+    g.append("text").attr("x",iw/2).attr("y",ih+30)
+        .attr("text-anchor","middle").attr("fill","var(--text-secondary)")
+        .attr("font-family","var(--font-mono)").attr("font-size",10).attr("font-weight","600")
+        .text((FACTOR_LABELS[factor]||factor).toUpperCase());
 
-    // --- 6. Insight Text ---
-    const first = trendData[0];
-    const last = trendData[trendData.length - 1];
-    
-    if (first && last) {
-        const diff = last.meanScore - first.meanScore;
-        const trendText = diff > 0 ? "increases" : "decreases";
-        const color = diff > 0 ? "green" : "red";
-        
-        // Cập nhật text vào thẻ div có id environmentInsight trong HTML
-        d3.select("#environmentInsight")
-            .style("text-align", "left") // Căn trái cho hợp sidebar
-            .html(`
-                <div class="stat-box">
-                    <div class="stat-label">Impact Analysis</div>
-                    <div style="font-size:13px; margin-top:5px;">
-                        As <b>${factor}</b> increases, scores tend to 
-                        <b style="color:${color}">${trendText}</b> by 
-                        <span style="font-size:18px; font-weight:bold; color:${color}">
-                            ${Math.abs(diff).toFixed(1)}
-                        </span> points.
-                    </div>
-                </div>
-            `);
-    }
-    
-    // QUAN TRỌNG: Đã xóa đoạn vẽ 3000 điểm .dot ở cuối hàm này để tránh lag và lỗi x is not defined
+    g.append("text").attr("transform","rotate(-90)").attr("x",-ih/2).attr("y",-26)
+        .attr("text-anchor","middle").attr("fill","var(--text-secondary)")
+        .attr("font-family","var(--font-mono)").attr("font-size",10).attr("font-weight","600")
+        .text("AVG EXAM SCORE");
+
+    // Side panel
+    const r        = pearsonR(data, factor);
+    const first    = trendData[0];
+    const last     = trendData[trendData.length-1];
+    const diff     = last && first ? last.meanScore - first.meanScore : 0;
+    const dir      = diff >= 0 ? "↑" : "↓";
+    const dirColor = diff >= 0 ? "var(--accent-green)" : "var(--accent-red)";
+    const rStrength = Math.abs(r) > 0.5 ? "Strong" : Math.abs(r) > 0.3 ? "Moderate" : "Weak";
+
+    // Inline annotation on chart — top-left
+    // Place annotation bottom-left — avoids right-side data clutter
+    const annG = g.append("g").attr("transform",`translate(4, ${ih - 30})`);
+    annG.append("rect").attr("rx",3).attr("width",Math.min(iw - 8, 190)).attr("height",24)
+        .attr("fill","var(--surface)").attr("opacity",0.88)
+        .attr("stroke","var(--border)").attr("stroke-width",0.8);
+    annG.append("text").attr("x",6).attr("y",10)
+        .attr("font-family","var(--font-mono)").attr("font-size","8.5px").attr("font-weight","600")
+        .attr("fill","var(--text-secondary)")
+        .text(`${rStrength} link: ${FACTOR_LABELS[factor]||factor} vs score`);
+    annG.append("text").attr("x",6).attr("y",20)
+        .attr("font-family","var(--font-mono)").attr("font-size","8px")
+        .attr("fill",dirColor)
+        .text(`Score ${dir}${Math.abs(diff).toFixed(1)} pts across full range`);
+
+    d3.select("#environmentInsight").html(`
+        <div class="stat-label">Corr. with Score</div>
+        <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:${Math.abs(r)>0.3?'var(--accent-blue)':'var(--text-muted)'}">
+            r = ${r.toFixed(3)}
+        </div>
+        <div class="stat-sub">${rStrength}</div>
+        <div class="stat-divider"></div>
+        <div class="insight-text">
+            Score <strong style="color:${dirColor}">${dir}${Math.abs(diff).toFixed(1)} pts</strong> full range.
+        </div>
+        ${factor==='sleep_hours'?`<div class="stat-divider"></div><div class="insight-text" style="color:var(--text-muted);font-size:10px">⚠ Confounders may mask.</div>`:''}
+    `);
 }

@@ -1,92 +1,180 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="light">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Performance Dashboard</title>
-    <!-- <script src="https://d3js.org/d3.v7.min.js"></script> -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script type="module" src="main.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
-
-
-<div id="tooltip" style="
-    position:absolute;
-    background:white;
-    padding:8px 12px;
-    border-radius:8px;
-    box-shadow:0 2px 8px rgba(0,0,0,0.2);
-    font-size:13px;
-    pointer-events:none;
-    opacity:0;
-"></div>
-
 <body>
-    
-    <h1>Student Performance Dashboard</h1>
 
-    <div class="controls">
-        <label><input type="checkbox" value="low" checked> Low motivation</label>
-        <label><input type="checkbox" value="medium" checked> Medium motivation</label>
-        <label><input type="checkbox" value="high" checked> High motivation</label>
+<div id="tooltip"></div>
+
+<div class="app">
+
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-left">
+            <div class="header-eyebrow">Academic Analytics</div>
+            <h1 class="header-title">Student Performance <em>Dashboard</em></h1>
+        </div>
+        <div class="header-right">
+            <div class="filter-label">Motivation</div>
+            <div class="controls">
+                <label class="chip">
+                    <input type="checkbox" value="low" checked>
+                    <span class="chip-dot" style="background:#ef4444"></span>Low
+                </label>
+                <label class="chip">
+                    <input type="checkbox" value="medium" checked>
+                    <span class="chip-dot" style="background:#f59e0b"></span>Medium
+                </label>
+                <label class="chip">
+                    <input type="checkbox" value="high" checked>
+                    <span class="chip-dot" style="background:#22c55e"></span>High
+                </label>
+            </div>
+            <button class="theme-toggle" id="themeToggle">🌙 Dark</button>
+        </div>
+    </header>
+
+    <!-- KPI BAR -->
+    <div class="kpi-bar">
+        <div class="kpi-item">
+            <div class="kpi-label">Total Students</div>
+            <div class="kpi-value" id="kpi-total">—</div>
+        </div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-item">
+            <div class="kpi-label">Avg Exam Score</div>
+            <div class="kpi-value" id="kpi-avg-score">—</div>
+        </div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-item">
+            <div class="kpi-label">Avg Attendance</div>
+            <div class="kpi-value" id="kpi-avg-att">—</div>
+        </div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-item">
+            <div class="kpi-label">Avg Study Hours/wk</div>
+            <div class="kpi-value" id="kpi-avg-hours">—</div>
+        </div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-item">
+            <div class="kpi-label">Above Average Score</div>
+            <div class="kpi-value" id="kpi-above75">—</div>
+        </div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-item">
+            <div class="kpi-label">#1 Key Factor</div>
+            <div class="kpi-value kpi-highlight" id="kpi-top-factor">—</div>
+        </div>
     </div>
 
+    <!-- MAIN GRID -->
+    <main class="grid">
 
-    <div class="grid">
-    
-        <div class="card">
-            <h2>Study vs Score</h2>
-            <div class="card-body">
-                <div class="chart-col">
-                    <div id="scatter"></div>
-                </div>
-                <div class="info-col" id="scatter-info">
-                    </div>
-            </div>      
-        </div>
+        <!-- ROW 1: Scatter (big) | Key Drivers (big, 2col) | Radar -->
 
-        <div class="card">
-            <h2>Top vs Bottom Students</h2>
-            <div class="card-body">
-                <div class="chart-col">
-                    <div id="bar"></div>
+        <div class="card" id="card-scatter">
+            <div class="card-header">
+                <div>
+                    <div class="card-tag">Correlation</div>
+                    <h2 class="card-title" id="scatter-title">Study Hours vs Exam Score</h2>
+                    <div id="scatter-subtitle" style="font-size:10px;color:var(--text-muted);font-style:italic;margin-top:2px;font-family:var(--font-body);"></div>
                 </div>
-                <div class="info-col" id="bar-info">
-                    </div>
+                
+            </div>
+            <div class="card-body">
+                <div class="chart-area" id="scatter"></div>
+                <div class="side-panel" id="scatter-info"></div>
             </div>
         </div>
 
-        <div class="card">
-            <h2>Environment Trend</h2>
-            <div class="control" style="margin-bottom: 10px;">
-                <label>Factor: </label>
-                <select id="environmentSelect">
-                    <option value="attendance">Attendance</option>
+        <div class="card" id="card-importance">
+            <div class="card-header">
+                <div>
+                    <div class="card-tag">Feature Importance</div>
+                    <h2 class="card-title">Key Drivers of Performance</h2>
+                    <div style="font-size:10px;color:var(--text-muted);font-style:italic;margin-top:2px;font-family:var(--font-body)">Click any dot to view correlation</div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-area" id="importance"></div>
+                <div class="side-panel" id="importance-info"></div>
+            </div>
+        </div>
+
+        <div class="card" id="card-radar">
+            <div class="card-header">
+                <div>
+                    <div class="card-tag">Student Profile</div>
+                    <h2 class="card-title">Top vs Bottom</h2>
+                </div>
+                <div class="card-badge">Norm. 0–1</div>
+            </div>
+            <div class="card-body">
+                <div class="chart-area" id="radar"></div>
+                <div class="side-panel" id="radar-info"></div>
+            </div>
+        </div>
+
+        <!-- ROW 2: Bar | Environment | Heatmap | (empty slot filled by heatmap spanning) -->
+
+        <div class="card" id="card-bar">
+            <div class="card-header">
+                <div>
+                    <div class="card-tag">Comparison</div>
+                    <h2 class="card-title">Top vs Bottom Quartile</h2>
+                </div>
+                <div class="card-badge" id="bar-sample-badge"></div>
+            </div>
+            <div class="card-body">
+                <div class="chart-area" id="bar"></div>
+                <div class="side-panel" id="bar-info"></div>
+            </div>
+        </div>
+
+        <div class="card" id="card-env">
+            <div class="card-header">
+                <div>
+                    <div class="card-tag">Trend Analysis</div>
+                    <h2 class="card-title">Factor vs Score</h2>
+                </div>
+                <select class="factor-select" id="environmentSelect">
+                    <option value="attendance">Attendance %</option>
                     <option value="sleep_hours">Sleep Hours</option>
                     <option value="physical_activity">Physical Activity</option>
-                    <option value="tutoring">Tutoring Hours</option>
+                    <option value="tutoring">Tutoring Sessions</option>
+                    <option value="previous_scores">Previous Scores</option>
                 </select>
             </div>
-
             <div class="card-body">
-                <div class="chart-col">
-                    <div id="environment"></div>
-                </div>
-                <div class="info-col" id="environment-info">
+                <div class="chart-area" id="environment"></div>
+                <div class="side-panel" id="environment-info">
                     <div id="environmentInsight"></div>
                 </div>
             </div>
         </div>
 
-        <div class="card">
-            <h2>Key Factors (Correlation)</h2>
-            <div class="card-body">
-                <div class="chart-col">
-                    <div id="importance"></div>
+        <!-- 4th col row 2: Score Distribution -->
+        <div class="card" id="card-extra">
+            <div class="card-header">
+                <div>
+                    <div class="card-tag">Score Distribution</div>
+                    <h2 class="card-title">Exam Score Histogram</h2>
                 </div>
-                <div class="info-col" id="importance-info">
-                    </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-area" id="histogram"></div>
             </div>
         </div>
-    </div>
-</body>
 
+    </main>
+</div>
+
+</body>
 </html>
