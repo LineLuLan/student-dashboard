@@ -133,7 +133,14 @@ body::before {
 .header-right {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
+}
+
+.header-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border);
+    flex-shrink: 0;
 }
 
 .filter-label {
@@ -207,19 +214,23 @@ body::before {
 
 .kpi-item {
     flex: 1;
+    min-width: 0;           /* prevent overflow */
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 2px;
+    padding: 0 4px;         /* equal breathing room */
 }
 
 .kpi-label {
     font-family: var(--font-mono);
-    font-size: 9.5px;
+    font-size: 9px;         /* slightly smaller = all labels same visual weight */
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
     color: var(--text-muted);
+    white-space: nowrap;    /* prevent label wrapping */
+    text-align: center;
 }
 
 .kpi-value {
@@ -236,6 +247,17 @@ body::before {
     text-align: center;
     font-family: var(--font-mono);
     font-weight: 700;
+}
+
+/* Sub-label row — always present for uniform KPI item height */
+.kpi-sub {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    text-align: center;
+    min-height: 13px;
+    line-height: 13px;
+    transition: color 0.3s;
 }
 
 .kpi-divider {
@@ -375,8 +397,8 @@ body::before {
     transition: background 0.3s;
 }
 
-/* Scatter — wider for Pearson r + legend */
-#card-scatter .side-panel  { flex: 0 0 152px; }
+/* Scatter side panel */
+#card-scatter .side-panel  { flex: 0 0 148px; }
 
 /* Importance — no side panel, full width for lollipop */
 #card-importance .side-panel { display: none; }
@@ -560,4 +582,64 @@ body::before {
     --low-color:     #fca5a5;
     --med-color:     #fde68a;
     --high-color:    #6ee7a0;
+}
+
+/* =============================================
+   VIEW SWITCHER — lives in header-right
+   ============================================= */
+.view-switcher {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+}
+
+.view-switcher-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.view-switcher-buttons {
+    display: flex;
+    gap: 3px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    box-shadow: var(--shadow);
+}
+
+.view-btn {
+    padding: 4px 10px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    white-space: nowrap;
+}
+
+.view-btn:hover {
+    color: var(--text-primary);
+    background: var(--surface-2);
+}
+
+.view-btn-active {
+    background: var(--accent-blue) !important;
+    color: #fff !important;
+    font-weight: 600;
+    box-shadow: 0 1px 4px rgba(37,99,235,0.3);
+}
+
+[data-theme="dark"] .view-btn-active {
+    box-shadow: 0 1px 6px rgba(76,142,245,0.4);
 }

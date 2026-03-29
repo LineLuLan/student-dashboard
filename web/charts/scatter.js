@@ -29,23 +29,21 @@ function pearsonR(data, xField) {
     return (denX && denY) ? num / Math.sqrt(denX * denY) : 0;
 }
 
-export function drawScatter(data, xField = "hours_studied", xLabel = "Study Hours") {
+export function drawScatter(data, xField = "hours_studied", xLabel = "Study Hours", colorMap, viewField = "motivation") {
     const container = d3.select("#scatter");
     const infoPanel = d3.select("#scatter-info");
-    // Cancel any pending transitions before removing to prevent
-    // "negative width" errors from interrupted tweens
     container.selectAll("*").interrupt().remove();
     infoPanel.html("");
 
     if (!data || data.length === 0) {
         container.html(`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;opacity:0.5">
             <div style="font-size:22px">⚙</div>
-            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);letter-spacing:0.05em">Select a motivation filter above</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">Select a filter above</div>
         </div>`);
         return;
     }
 
-    // Encode categorical fields to numeric for scatter
+    // Encode categorical x-field to numeric for regression/scatter
     let plotData = data;
     let plotField = xField;
     const sampleVal = data[0]?.[xField];
@@ -58,66 +56,82 @@ export function drawScatter(data, xField = "hours_studied", xLabel = "Study Hour
         }));
         plotField = xField + "_enc";
     }
-    // Use encoded data for all rendering
-    data = plotData;
-    xField = plotField;
+    data    = plotData;
+    xField  = plotField;
 
     const _rect = container.node().getBoundingClientRect();
-    const w = _rect.width  || container.node().offsetWidth  || container.node().parentNode?.clientWidth  || 300;
-    const h = _rect.height || container.node().offsetHeight || container.node().parentNode?.clientHeight || 200;
+    const w = _rect.width  || container.node().offsetWidth  || 300;
+    const h = _rect.height || container.node().offsetHeight || 200;
     if (w < 10 || h < 10) return;
 
-    const { slope, intercept } = linearRegression(plotData, plotField);
-    const r2 = calculateR2(plotData, plotField, slope, intercept);
-    const r  = pearsonR(plotData, plotField);
+    const { slope, intercept } = linearRegression(data, xField);
+    const r2 = calculateR2(data, xField, slope, intercept);
+    const r  = pearsonR(data, xField);
 
-    const strengthLabel = Math.abs(r) > 0.5 ? "Strong" : Math.abs(r) > 0.3 ? "Moderate" : "Weak";
-    const strengthColor = Math.abs(r) > 0.5 ? "var(--accent-green)" : Math.abs(r) > 0.3 ? "var(--accent-yellow)" : "var(--accent-red)";
+    // ── Side panel ───────────────────────────────────────────────
+    colorMap = colorMap || { low: "var(--low-color)", medium: "var(--med-color)", high: "var(--high-color)" };
+    const rPct        = (r2 * 100).toFixed(0);
+    const linkStr     = Math.abs(r) > 0.5 ? "Strong link" : Math.abs(r) > 0.3 ? "Moderate link" : "Weak link";
+    const direction   = r >= 0 ? "More" : "Less";
+    const viewCfg     = window.__viewConfig__ || null;
 
-    // Side panel rendered in HTML — no longer overlapping SVG
-    // Plain language for non-technical stakeholders
-    const rPct = (r2 * 100).toFixed(0);
-    const linkStrength = Math.abs(r) > 0.5 ? "Strong link" : Math.abs(r) > 0.3 ? "Moderate link" : "Weak link";
-    const direction = r >= 0 ? "More" : "Less";
+    if (viewCfg && viewCfg.sidePanelStat) {
+        // Non-main view: no legend — chips already show it
+        infoPanel.html(`
+            <div class="stat-block">
+                <div class="stat-label">${viewCfg.sidePanelTitle}</div>
+                <div style="font-family:var(--font-mono);font-size:28px;font-weight:700;color:var(--accent-green);line-height:1;margin:4px 0">${viewCfg.sidePanelStat}</div>
+                <div style="font-size:10px;color:var(--text-muted);line-height:1.5">${viewCfg.sidePanelDesc}</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div style="font-size:10px;color:var(--text-muted);line-height:1.6">
+                ⚠ Much smaller than<br>
+                <span style="color:var(--accent-blue);font-weight:600">Attendance (↑7.8 pts)</span>
+            </div>
+        `);
+    } else {
+        // Main view: no legend (chips in header already show it) — full space for insight
+        infoPanel.html(`
+            <div class="stat-block">
+                <div class="stat-label">How Much It Matters</div>
+                <div style="font-family:var(--font-mono);font-size:28px;font-weight:700;color:var(--text-primary);line-height:1;margin:4px 0">${rPct}%</div>
+                <div style="font-size:10px;color:var(--text-muted);line-height:1.5">of score differences<br>explained by ${xLabel}</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div style="font-size:10px;color:var(--text-muted);line-height:1.6">${direction} ${xLabel} →
+                <span style="color:var(--text-secondary);font-weight:600">${linkStr.toLowerCase()}</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div style="font-size:10px;color:var(--text-muted);line-height:1.5">
+                Dot size reflects<br>local data density
+            </div>
+        `);
+    }
 
-    // Visual hierarchy: rPct% is the ONE hero number, everything else subdued
-    infoPanel.html(`
-        <div class="stat-block">
-            <div class="stat-label">How Much It Matters</div>
-            <div style="font-family:var(--font-mono);font-size:26px;font-weight:700;color:var(--text-primary);line-height:1">${rPct}%</div>
-            <div style="font-size:10px;font-weight:400;color:var(--text-muted);margin-top:2px">of score differences<br>explained by ${xLabel}</div>
-        </div>
-        <div class="stat-divider"></div>
-        <div style="font-size:10px;font-weight:400;color:var(--text-muted)">${direction} ${xLabel} →&nbsp;
-            <span style="color:var(--text-secondary);font-weight:600">${linkStrength.toLowerCase()}</span>
-        </div>
-        <div class="stat-divider"></div>
-        <div style="display:flex;flex-direction:column;gap:3px">
-            <div style="font-size:9px;font-weight:600;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.1em;font-family:var(--font-mono)">Motivation</div>
-            <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-muted)"><span style="width:7px;height:7px;border-radius:50%;background:var(--low-color);display:inline-block;flex-shrink:0"></span>Low</div>
-            <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-muted)"><span style="width:7px;height:7px;border-radius:50%;background:var(--med-color);display:inline-block;flex-shrink:0"></span>Medium</div>
-            <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-muted)"><span style="width:7px;height:7px;border-radius:50%;background:var(--high-color);display:inline-block;flex-shrink:0"></span>High</div>
-        </div>
-    `);
+    // ── Subtitle update ──────────────────────────────────────────
+    const strengthTxt = Math.abs(r) > 0.5 ? "strong" : Math.abs(r) > 0.3 ? "moderate" : "weak";
+    const subtitleEl  = document.getElementById("scatter-subtitle");
+    if (subtitleEl) {
+        if (viewCfg && viewCfg.scatterSubtitle) {
+            subtitleEl.textContent = viewCfg.scatterSubtitle;
+        } else {
+            subtitleEl.textContent = `${direction} ${xLabel} = higher score (${strengthTxt} link) · explains ${rPct}% of score differences`;
+        }
+    }
 
-    // Full width for chart — no internal side panel eating into SVG
+    // ── SVG setup ────────────────────────────────────────────────
     const m  = { top: 10, right: 12, bottom: 38, left: 40 };
     const iw = w - m.left - m.right;
     const ih = h - m.top - m.bottom;
     if (iw <= 0 || ih <= 0) return;
 
-    const svg = container.append("svg").attr("width",w).attr("height",h).style("overflow","visible");
-
-    // No glow filters — they cause mouseout element reference issues
-
-    const g = svg.append("g").attr("transform",`translate(${m.left},${m.top})`);
+    const svg = container.append("svg").attr("width", w).attr("height", h).style("overflow","visible");
+    const g   = svg.append("g").attr("transform", `translate(${m.left},${m.top})`);
 
     const x = d3.scaleLinear().domain(d3.extent(data, d => d[xField])).nice().range([0, iw]);
     const y = d3.scaleLinear().domain(d3.extent(data, d => d.exam_score)).nice().range([ih, 0]);
 
-    const colorMap = { low:"var(--low-color)", medium:"var(--med-color)", high:"var(--high-color)" };
-
-    // Gridlines — no transition to avoid negative width tween on interrupt
+    // Gridlines
     const glLeft = g.append("g").attr("class","gl");
     glLeft.call(d3.axisLeft(y).ticks(5).tickSize(-iw).tickFormat(""));
     glLeft.selectAll("line").attr("stroke","var(--border)").attr("stroke-dasharray","3,3");
@@ -142,28 +156,25 @@ export function drawScatter(data, xField = "hours_studied", xLabel = "Study Hour
         .attr("font-family","var(--font-mono)").attr("font-size",11).attr("font-weight","600")
         .text("EXAM SCORE");
 
-    // Density-aware dot sizing — fast grid O(n), not O(n²)
+    // Density grid (O(n))
     const px_list = data.map(d => x(d[xField]));
     const py_list = data.map(d => y(d.exam_score));
-    const CELL = Math.max(iw, ih) * 0.06;
+    const CELL    = Math.max(iw, ih) * 0.06;
     const gridMap = new Map();
     data.forEach((d, i) => {
-        const gx = Math.floor(px_list[i] / CELL);
-        const gy = Math.floor(py_list[i] / CELL);
-        const key = `${gx},${gy}`;
+        const key = `${Math.floor(px_list[i]/CELL)},${Math.floor(py_list[i]/CELL)}`;
         gridMap.set(key, (gridMap.get(key) || 0) + 1);
     });
     const density = data.map((d, i) => {
-        const gx = Math.floor(px_list[i] / CELL);
-        const gy = Math.floor(py_list[i] / CELL);
+        const gx = Math.floor(px_list[i]/CELL), gy = Math.floor(py_list[i]/CELL);
         let count = 0;
-        for (let dx2 = -1; dx2 <= 1; dx2++)
-            for (let dy2 = -1; dy2 <= 1; dy2++)
+        for (let dx2=-1; dx2<=1; dx2++)
+            for (let dy2=-1; dy2<=1; dy2++)
                 count += gridMap.get(`${gx+dx2},${gy+dy2}`) || 0;
         return count;
     });
     const maxDensity = d3.max(density) || 1;
-    const rScale = d3.scaleSqrt().domain([1, maxDensity]).range([3.8, 1.8]);
+    const rScale  = d3.scaleSqrt().domain([1, maxDensity]).range([3.8, 1.8]);
     const opScale = d3.scaleLinear().domain([1, maxDensity]).range([0.80, 0.40]);
 
     // Regression line
@@ -174,26 +185,16 @@ export function drawScatter(data, xField = "hours_studied", xLabel = "Study Hour
         .attr("stroke","var(--accent-blue)").attr("stroke-width",2)
         .attr("stroke-dasharray","7,4").attr("opacity",0.55);
 
-    // Insight: written as subtitle under chart title (in HTML), not overlaid on chart
-    const strengthTxt = Math.abs(r) > 0.5 ? "strong" : Math.abs(r) > 0.3 ? "moderate" : "weak";
-    const subtitleEl = document.getElementById("scatter-subtitle");
-    if (subtitleEl) {
-        subtitleEl.textContent = `${r >= 0 ? "More" : "Less"} ${xLabel} = higher score (${strengthTxt} link) · explains ${(r2*100).toFixed(0)}% of score differences`;
-    }
-
-    // Detect if field is discrete (integer values) → add jitter
-    const uniqueX = new Set(data.map(d => d[xField]));
-    const isDiscrete = uniqueX.size < 60; // attendance 60-100 = discrete integers
+    // Jitter for discrete x fields
+    const uniqueX     = new Set(data.map(d => d[xField]));
+    const isDiscrete  = uniqueX.size < 60;
     const jitterRange = isDiscrete ? (x(1) - x(0)) * 0.35 : 0;
-
-    // Seed-consistent jitter per data point
-    const jitter = data.map((d, i) => {
-        // deterministic pseudo-random based on index
+    const jitter      = data.map((d, i) => {
         const s = Math.sin(i * 9301 + 49297) * 233280;
         return (s - Math.floor(s) - 0.5) * 2 * jitterRange;
     });
 
-    // Dots — dense first, sparse on top
+    // Dots
     const indexed = data.map((d,i) => ({d,i})).sort((a,b) => density[b.i]-density[a.i]);
     const tooltip = d3.select("#tooltip");
 
@@ -201,13 +202,15 @@ export function drawScatter(data, xField = "hours_studied", xLabel = "Study Hour
         .data(indexed)
         .enter().append("circle")
         .attr("cx", ({d,i}) => x(d[xField]) + jitter[i])
-        .attr("cy", ({d}) => y(d.exam_score))
-        .attr("r",  ({i}) => rScale(density[i]))
-        .attr("fill", ({d}) => colorMap[d.motivation] || colorMap.medium)
+        .attr("cy", ({d})   => y(d.exam_score))
+        .attr("r",  ({i})   => rScale(density[i]))
+        .attr("fill", ({d}) => {
+            const v = (d[viewField] || "").toString().trim().toLowerCase();
+            return colorMap[v] || "var(--med-color)";
+        })
         .attr("opacity", 0)
-        .attr("stroke","none");
+        .attr("stroke", "none");
 
-    // Lower opacity for discrete/overplotted fields
     const baseOpacity = ({i}) => isDiscrete
         ? Math.min(0.55, opScale(density[i]))
         : opScale(density[i]);
@@ -218,32 +221,31 @@ export function drawScatter(data, xField = "hours_studied", xLabel = "Study Hour
     circles
         .on("mouseover", function(event, {d, i}) {
             d3.select(this).interrupt()
-                .attr("r", 6.5)
-                .attr("opacity", 1)
-                .attr("stroke", "#fff")
-                .attr("stroke-width", 2);
+                .attr("r", 6.5).attr("opacity", 1)
+                .attr("stroke", "#fff").attr("stroke-width", 2);
+            const vLabel = window.__viewLabel__ || "Motivation";
+            const vVal   = (d[viewField] || "").replace(/_/g," ");
+            const vColor = colorMap[(d[viewField]||"").toLowerCase()] || "var(--med-color)";
             tooltip.style("opacity",1).html(`
                 <strong>Score</strong><span class="tt-val">${d.exam_score}</span>
                 <strong>${xLabel}</strong><span class="tt-val">${d[xField]}</span>
-                <strong>Motivation</strong><span class="tt-val" style="text-transform:capitalize;color:${d.motivation==="low"?"var(--low-color)":d.motivation==="high"?"var(--high-color)":"var(--med-color)"}">${d.motivation}</span>
+                <strong>${vLabel}</strong><span class="tt-val" style="color:${vColor};text-transform:capitalize">${vVal}</span>
                 <strong>Attendance</strong><span class="tt-val">${d.attendance}%</span>
                 <strong>Prev Score</strong><span class="tt-val">${d.previous_scores}</span>
             `);
         })
         .on("mousemove", e => {
-                const ttW = 220, ttH = 130;
-                const tx = e.clientX + 16 + ttW > window.innerWidth
-                    ? e.clientX - ttW - 8
-                    : e.clientX + 16;
-                const ty = Math.min(e.clientY - 10, window.innerHeight - ttH);
-                tooltip.style("left", tx+"px").style("top", ty+"px");
-            })
+            const ttW = 220, ttH = 130;
+            const tx  = e.clientX + 16 + ttW > window.innerWidth ? e.clientX - ttW - 8 : e.clientX + 16;
+            const ty  = Math.min(e.clientY - 10, window.innerHeight - ttH);
+            tooltip.style("left", tx+"px").style("top", ty+"px");
+        })
         .on("mouseout", function(event, {i}) {
             d3.select(this).interrupt()
-                .attr("r",            rScale(density[i]))
-                .attr("opacity",      isDiscrete ? Math.min(0.55, opScale(density[i])) : opScale(density[i]))
-                .attr("stroke",       "none")
+                .attr("r",       rScale(density[i]))
+                .attr("opacity", isDiscrete ? Math.min(0.55, opScale(density[i])) : opScale(density[i]))
+                .attr("stroke",  "none")
                 .attr("stroke-width", 0);
-            tooltip.style("opacity",0);
+            tooltip.style("opacity", 0);
         });
 }

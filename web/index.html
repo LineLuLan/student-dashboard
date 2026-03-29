@@ -22,6 +22,17 @@
             <h1 class="header-title">Student Performance <em>Dashboard</em></h1>
         </div>
         <div class="header-right">
+            <!-- View Switcher -->
+            <div class="view-switcher">
+                <span class="view-switcher-label">ANALYZE BY</span>
+                <div class="view-switcher-buttons">
+                    <button class="view-btn view-btn-active" data-view="main">Motivation</button>
+                    <button class="view-btn" data-view="teacher_quality">Teacher Quality</button>
+                    <button class="view-btn" data-view="parental_involvement">Parental Involvement</button>
+                    <button class="view-btn" data-view="peer_influence">Peer Influence</button>
+                </div>
+            </div>
+            <div class="header-divider"></div>
             <div class="filter-label">Motivation</div>
             <div class="controls">
                 <label class="chip">
@@ -46,31 +57,37 @@
         <div class="kpi-item">
             <div class="kpi-label">Total Students</div>
             <div class="kpi-value" id="kpi-total">—</div>
+            <div class="kpi-sub">&nbsp;</div>
         </div>
         <div class="kpi-divider"></div>
         <div class="kpi-item">
             <div class="kpi-label">Avg Exam Score</div>
             <div class="kpi-value" id="kpi-avg-score">—</div>
+            <div class="kpi-sub" id="kpi-score-delta">&nbsp;</div>
         </div>
         <div class="kpi-divider"></div>
         <div class="kpi-item">
             <div class="kpi-label">Avg Attendance</div>
             <div class="kpi-value" id="kpi-avg-att">—</div>
+            <div class="kpi-sub">&nbsp;</div>
         </div>
         <div class="kpi-divider"></div>
         <div class="kpi-item">
-            <div class="kpi-label">Avg Study Hours/wk</div>
+            <div class="kpi-label">Avg Study Hrs/Wk</div>
             <div class="kpi-value" id="kpi-avg-hours">—</div>
+            <div class="kpi-sub">&nbsp;</div>
         </div>
         <div class="kpi-divider"></div>
         <div class="kpi-item">
-            <div class="kpi-label">Above Average Score</div>
+            <div class="kpi-label">Above Avg Score</div>
             <div class="kpi-value" id="kpi-above75">—</div>
+            <div class="kpi-sub">(score &gt; mean)</div>
         </div>
         <div class="kpi-divider"></div>
         <div class="kpi-item">
             <div class="kpi-label">#1 Key Factor</div>
             <div class="kpi-value kpi-highlight" id="kpi-top-factor">—</div>
+            <div class="kpi-sub">&nbsp;</div>
         </div>
     </div>
 
