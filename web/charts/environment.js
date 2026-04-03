@@ -76,7 +76,7 @@ export function drawEnvironmentTrend(data, factor) {
     // Gridlines
     const _gl = g.append("g").attr("class","gl");
     _gl.call(d3.axisLeft(yScale).ticks(5).tickSize(-iw).tickFormat(""));
-    _gl.selectAll("line").attr("stroke","var(--border)").attr("stroke-dasharray","3,3");
+    _gl.selectAll("line").attr("stroke","var(--border)").attr("stroke-opacity","0.4").attr("stroke-dasharray","4,4");
     _gl.select(".domain").remove();
 
     // IQR band

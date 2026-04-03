@@ -134,13 +134,10 @@ export function drawScatter(data, xField = "hours_studied", xLabel = "Study Hour
     // Gridlines
     const glLeft = g.append("g").attr("class","gl");
     glLeft.call(d3.axisLeft(y).ticks(5).tickSize(-iw).tickFormat(""));
-    glLeft.selectAll("line").attr("stroke","var(--border)").attr("stroke-dasharray","3,3");
+    glLeft.selectAll("line").attr("stroke","var(--border)").attr("stroke-opacity","0.4").attr("stroke-dasharray","4,4");
     glLeft.select(".domain").remove();
 
-    const glBottom = g.append("g").attr("class","glx").attr("transform",`translate(0,${ih})`);
-    glBottom.call(d3.axisBottom(x).ticks(6).tickSize(-ih).tickFormat(""));
-    glBottom.selectAll("line").attr("stroke","var(--border)").attr("stroke-dasharray","3,3");
-    glBottom.select(".domain").remove();
+    // No vertical gridlines — reduces visual noise in dense scatter
 
     // Axes
     g.append("g").attr("transform",`translate(0,${ih})`).call(d3.axisBottom(x).ticks(7));
@@ -174,8 +171,8 @@ export function drawScatter(data, xField = "hours_studied", xLabel = "Study Hour
         return count;
     });
     const maxDensity = d3.max(density) || 1;
-    const rScale  = d3.scaleSqrt().domain([1, maxDensity]).range([3.8, 1.8]);
-    const opScale = d3.scaleLinear().domain([1, maxDensity]).range([0.80, 0.40]);
+    const rScale  = d3.scaleSqrt().domain([1, maxDensity]).range([4.0, 2.0]);
+    const opScale = d3.scaleLinear().domain([1, maxDensity]).range([0.55, 0.20]); // 20-55% opacity
 
     // Regression line
     const [xMin, xMax] = x.domain();
@@ -212,7 +209,7 @@ export function drawScatter(data, xField = "hours_studied", xLabel = "Study Hour
         .attr("stroke", "none");
 
     const baseOpacity = ({i}) => isDiscrete
-        ? Math.min(0.55, opScale(density[i]))
+        ? Math.min(0.40, opScale(density[i]))
         : opScale(density[i]);
 
     circles.transition().duration(500).delay((_,idx) => idx * 0.2)

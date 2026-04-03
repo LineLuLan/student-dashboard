@@ -514,6 +514,11 @@ body::before {
 
 .tick line, .domain { stroke: var(--border) !important; }
 
+/* Axis tick lines subtle */
+.tick line {
+    stroke-opacity: 0.5 !important;
+}
+
 /* =============================================
    TOOLTIP
    ============================================= */
@@ -606,7 +611,7 @@ body::before {
 
 .view-switcher-buttons {
     display: flex;
-    gap: 3px;
+    gap: 4px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -615,7 +620,7 @@ body::before {
 }
 
 .view-btn {
-    padding: 4px 10px;
+    padding: 5px 13px;
     border: none;
     border-radius: 5px;
     background: transparent;
@@ -626,6 +631,7 @@ body::before {
     cursor: pointer;
     transition: all 0.18s ease;
     white-space: nowrap;
+    letter-spacing: 0.01em;
 }
 
 .view-btn:hover {
@@ -642,4 +648,37 @@ body::before {
 
 [data-theme="dark"] .view-btn-active {
     box-shadow: 0 1px 6px rgba(76,142,245,0.4);
+}
+
+/* No glow/filter on chart lines — keep crisp */
+.chart-area path,
+.chart-area line {
+    filter: none !important;
+}
+
+/* =============================================
+   ML COMPONENTS
+   ============================================= */
+
+/* Risk engine fills card body */
+#risk-engine {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+}
+
+#card-bar .card-body {
+    padding: 0;
+    overflow: hidden;
+}
+
+/* Personas chart area */
+#personas {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+#card-radar .card-body {
+    padding: 0;
 }

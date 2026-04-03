@@ -4,7 +4,8 @@ import { drawTopBottom }        from "./charts/bar.js";
 import { drawEnvironmentTrend } from "./charts/environment.js";
 import { drawKeyFactors }       from "./charts/importance.js";
 
-import { drawRadar }            from "./charts/radar.js";
+import { drawPersonas }         from "./charts/personas.js";
+import { drawRiskEngine }       from "./charts/risk.js";
 import { drawHistogram }        from "./charts/histogram.js";
 
 const envSelect = document.getElementById("environmentSelect");
@@ -304,11 +305,12 @@ export function onFactorClick(fieldKey, fieldLabel) {
 function drawAll(filtered, colorMap) {
     const vf = VIEW_CONFIG[currentView]?.field || "motivation";
     drawScatter(filtered, scatterXField, scatterXLabel, colorMap, vf);
-    drawTopBottom(filtered);
     drawEnvironmentTrend(filtered, envSelect.value);
     drawKeyFactors(filtered, onFactorClick);
-    drawRadar(filtered);
     drawHistogram(filtered);
+    // ML components — static data, draw once
+    drawPersonas();
+    drawRiskEngine();
 }
 
 // ── Update ────────────────────────────────────────────────────────

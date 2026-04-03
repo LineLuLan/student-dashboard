@@ -76,7 +76,7 @@ export function drawKeyFactors(data, onBarClick) {
     };
     const useShort = true;  // always short — prevents truncation at any card width
     const leftMargin = Math.min(80, w * 0.36);
-    const m = { top: 6, right: 40, bottom: 8, left: leftMargin };
+    const m = { top: 10, right: 44, bottom: 24, left: leftMargin };
     const iw = w - m.left - m.right;
     const ih = h - m.top - m.bottom;
     if (iw <= 4 || ih <= 4) return;
@@ -88,7 +88,7 @@ export function drawKeyFactors(data, onBarClick) {
 
     const maxAbs = d3.max(correlations, d => d.abs) || 1;
     const x = d3.scaleLinear().domain([-maxAbs * 1.1, maxAbs * 1.1]).range([0, iw]);
-    const y = d3.scaleBand().domain(correlations.map(d => d.label)).range([0, ih]).padding(0.3);
+    const y = d3.scaleBand().domain(correlations.map(d => d.label)).range([0, ih]).padding(0.38);
 
     const zero = x(0);
 
@@ -110,11 +110,11 @@ export function drawKeyFactors(data, onBarClick) {
         }
     });
 
+    // Semantic color: highlight #1 factor (Attendance) only, neutral for rest
     const dotColor = (d, i) => {
-        if (d.r < 0) return "var(--accent-red)";
-        if (i === 0) return "var(--accent-blue)";
-        if (i === 1) return "var(--accent-purple)";
-        return "var(--accent-green)";
+        if (d.key === "attendance") return "var(--accent-blue)";  // hero
+        if (d.r < 0) return "var(--text-muted)";                  // negative = neutral gray
+        return "var(--text-muted)";                                // positive but not hero = gray
     };
 
     const tooltip = d3.select("#tooltip");
@@ -130,15 +130,15 @@ export function drawKeyFactors(data, onBarClick) {
             .attr("x1", zero).attr("y1", cy)
             .attr("x2", cx).attr("y2", cy)
             .attr("stroke", col)
-            .attr("stroke-width", i < 2 ? 2.5 : 1.8)
-            .attr("opacity", i < 2 ? 0.75 : 0.55);
+            .attr("stroke-width", d.key === "attendance" ? 2.5 : 1.5)
+            .attr("opacity", d.key === "attendance" ? 0.8 : 0.4);
 
         // Dot
         const dot = g.append("circle")
             .attr("cx", cx).attr("cy", cy)
-            .attr("r", i < 2 ? 7 : 5)
+            .attr("r", d.key === "attendance" ? 8 : 5)
             .attr("fill", col)
-            .attr("opacity", i < 2 ? 1 : 0.65)
+            .attr("opacity", d.key === "attendance" ? 1 : 0.55)
             .attr("stroke", "var(--surface)").attr("stroke-width", 1.5)
             .attr("cursor", isClickable ? "pointer" : "default");
 
@@ -149,9 +149,10 @@ export function drawKeyFactors(data, onBarClick) {
             .attr("x", labelX).attr("y", cy + 1)
             .attr("dominant-baseline","middle")
             .attr("text-anchor", anchor)
-            .attr("font-family","var(--font-mono)").attr("font-size", i < 2 ? "10px" : "9px")
-            .attr("font-weight", i < 2 ? "700" : "400")
-            .attr("fill", col)
+            .attr("font-family","var(--font-mono)")
+            .attr("font-size", d.key === "attendance" ? "10.5px" : "9px")
+            .attr("font-weight", d.key === "attendance" ? "700" : "400")
+            .attr("fill", d.key === "attendance" ? "var(--accent-blue)" : "var(--text-muted)")
             .text(d.r.toFixed(2));
 
         // Y axis labels (left side)
@@ -159,9 +160,9 @@ export function drawKeyFactors(data, onBarClick) {
             .attr("x", -6).attr("y", cy)
             .attr("dominant-baseline","middle")
             .attr("text-anchor","end")
-            .attr("font-family","var(--font-mono)")
-            .attr("font-size", "10px")
-            .attr("font-weight", i < 2 ? "600" : "400")
+            .attr("font-family","system-ui, -apple-system, 'Segoe UI', sans-serif")
+            .attr("font-size", i < 2 ? "11px" : "10.5px")
+            .attr("font-weight", i < 2 ? "600" : "500")
             .attr("fill", i < 2 ? "var(--text-primary)" : "var(--text-secondary)")
             .text(useShort ? (SHORT_LABELS[d.label] || d.label) : d.label);
 
@@ -192,13 +193,15 @@ export function drawKeyFactors(data, onBarClick) {
             });
     });
 
-    // X axis tick labels at bottom
+    // X axis tick labels at bottom — sans-serif for readability
     [-0.2, 0, 0.2, 0.4, 0.6].forEach(v => {
         if (x(v) >= 0 && x(v) <= iw) {
             g.append("text")
-                .attr("x", x(v)).attr("y", ih + 14)
+                .attr("x", x(v)).attr("y", ih + 16)
                 .attr("text-anchor","middle")
-                .attr("font-family","var(--font-mono)").attr("font-size","8px")
+                .attr("font-family","system-ui, -apple-system, 'Segoe UI', sans-serif")
+                .attr("font-size","9px")
+                .attr("font-weight","400")
                 .attr("fill","var(--text-muted)")
                 .text(v.toFixed(1));
         }
